@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+  <meta charset="UTF-8">
+  <title>Discogs Hintahaku</title>
+</head>
+<body>
+  <h2>Levyn hinta Discogsista</h2>
+
+  <form id="etsintaForm">
+    <!-- valinta halutusta formaatista -->
+    <label>Formaatti:
+      <select name="formaatti" required>
+        <option value="Vinyl">LP</option>
+        <option value="CD">CD</option>
+        <option value="Cassette">Kasetti</option>
+      </select>
+    </label><br><br>
+
+   <!-- artistin ja levyn valinta -->
+    Artisti: <input type="text" name="artisti" required><br>
+    Levy: <input type="text" name="levy" required><br>
+    <button type="submit">Etsi painokset</button> <!-- lähetetään hakulomake -->
+  </form>
+
+  <div id="painosValinta" style="display:none;">
+    <label>Valitse painos:
+      <select id="painosLista"></select> <!-- valikko jossa painokset -->
+    </label>
+    <button id="haeHintaBtn">Hae hinta</button><!-- painike, jolla haetaan kyseisen levyn hinta -->
+  </div>
+
+  <p id="tulos"></p>
+
+  <script>
+    document.getElementById('etsintaForm').addEventListener('submit', function(e) {
+      e.preventDefault(); // Estetään sivun uudelleenlataus
+      const formData = new FormData(this);
+
+      // lähetetään saadut tiedot palvelimelle
+      fetch('/hae_painokset', {
+        method: 'POST',
+        body: formData
+      })
+      .then(res => res.json())
+      .then(data => {
+        const lista = document.getElementById('painosLista');
+        lista.innerHTML = '';
+
+        if (!data.painokset || data.painokset.length === 0) {
+          document.getElementById('tulos').innerText = 'Levyä ei juuri nyt ole myynnissä';
+          return;
+        }
+
+        data.painokset.forEach(p => {
+          const option = document.createElement('option');
+          const catno = p.catno || 'N/A'; // Varmistetaan että catno on olemassa
+         option.value = p.id;
+          option.textContent = `${p.title} | Cat#: ${catno}, ${p.year}, ${p.country}, ${p.format}, ${p.label}`;
+          lista.appendChild(option);
+        });
+
+
+        document.getElementById('painosValinta').style.display = 'block';
+      })
+      .catch(error => {
+        document.getElementById('tulos').innerText = 'Virhe haettaessa painoksia.';
+        console.error(error);
+      });
+    });
+
+    document.getElementById('haeHintaBtn').addEventListener('click', function() {
+      const release_id = document.getElementById('painosLista').value;
+      const formData = new FormData();
+      formData.append('release_id', release_id);
+
+      fetch('/hae_hinta', {
+        method: 'POST',
+        body: formData
+      })
+      .then(res => res.json())
+      .then(data => {
+        const hinta = data.hinta;
+        if (typeof hinta === 'object' && hinta !== null && 'value' in hinta && 'currency' in hinta) {
+          const valuutta = hinta.currency === 'EUR' ? '€' : hinta.currency;
+          document.getElementById('tulos').innerText = 'Alin hinta: ' + hinta.value + ' ' + valuutta;
+        } else {
+          document.getElementById('tulos').innerText = 'Alin hinta: ' + hinta;
+        }
+      })
+      .catch(error => {
+        document.getElementById('tulos').innerText = 'Virhe haettaessa hintaa.';
+        console.error(error);
+      });
+    });
+  </script>
+</body>
+</html>
